@@ -1,0 +1,20 @@
+{
+  "host": "127.0.0.1",
+  "port": 8081,
+  "level": "info",
+  "proxies": [
+    {
+      "socks": "127.0.0.1:1080",
+      "whitelist": [
+        "google\\.com",
+        "\\.org$"
+      ]
+    },
+    {
+      "socks": "127.0.0.1:1081",
+      "blacklist": [
+        "^github\\.com$"
+      ]
+    }
+  ]
+}

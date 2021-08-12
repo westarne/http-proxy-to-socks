@@ -2,84 +2,95 @@
 const util = require('util');
 const http = require('http');
 const net = require('net');
-const fs = require('fs');
 const Socks = require('socks');
 const { logger } = require('./logger');
 
-function randomElement(array) {
-  return array[Math.floor(Math.random() * array.length)];
-}
+// object class definition
 
-function getProxyObject(host, port, login, password) {
-  return {
-    ipaddress: host,
-    port: parseInt(port, 10),
-    type: 5,
-    authentication: { username: login || '', password: password || '' },
-  };
-}
+function ProxyServer(options) {
+  // TODO: start point
+  http.Server.call(this, () => { });
 
-function parseProxyLine(line) {
-  const proxyInfo = line.split(':');
+  this.proxyList = [];
 
-  if(proxyInfo.length !== 4 && proxyInfo.length !== 2) {
-    throw new Error(`Incorrect proxy line: ${line}`);
+  if(options.proxies) {
+    // stand alone proxy loging
+    this.proxyList = options.proxies.map(proxy => {
+      let socksProxy = parseProxyLine(proxy.socks);
+      let whitelist = proxy.whitelist ? proxy.whitelist.map(regex => new RegExp(regex)) : undefined;
+      let blacklist = !whitelist && proxy.blacklist ? proxy.blacklist.map(regex => new RegExp(regex)) : undefined;
+
+      return { socksProxy, whitelist, blacklist };
+    });
   }
 
-  return getProxyObject.apply(this, proxyInfo);
+  this.addListener(
+    'request',
+    requestListener.bind(null, this.proxyList)
+  );
+  this.addListener(
+    'connect',
+    connectListener.bind(null, this.proxyList)
+  );
 }
 
-function sendProxyRequest(uri, request, response, agent) {
-  const options = {
-    port: uri.port,
-    hostname: uri.host,
-    method: request.method,
-    path: uri.path,
-    headers: request.headers,
-    agent,
-  };
+util.inherits(ProxyServer, http.Server);
 
-  const proxyRequest = http.request(options);
+// listeners
 
-  request.on('error', (err) => {
-    logger.error(`${err.message}`);
-    proxyRequest.destroy(err);
-  });
+/**
+ * called on HTTP targets
+ */
+function requestListener(proxyList, request, response) {
+  logger.info(`request: ${request.url}`);
 
-  proxyRequest.on('error', (error) => {
-    logger.error(`${error.message} on connection to  ${uri.host}:${uri.port}`);
-    response.writeHead(500);
-    response.end('Connection error\n');
-  });
+  const target = new URL(request.url);
+  const proxy = getProxyInfo(proxyList, target);
 
-  proxyRequest.on('response', (proxyResponse) => {
-    proxyResponse.pipe(response);
-    response.writeHead(proxyResponse.statusCode, proxyResponse.headers);
-  });
-
-  request.pipe(proxyRequest);
+  if(proxy) {
+    onSocksHttp(target, request, response, proxy);
+  }
+  else {
+    onNoProxyHttp(target, request, response);
+  }
 }
 
-function onSocksHttp(req, res, proxy) {
-  const ph = new URL(req.url);
-  const socksAgent = new Socks.Agent({
-    proxy,
-    target: { host: ph.hostname, port: ph.port },
-  });
-  sendProxyRequest(ph, req, res, socksAgent);
-}
-
-function onSocksHttps(request, socketRequest, head, proxy) {
+/**
+ * called on HTTPs targets
+ */
+function connectListener(proxyList, request, socketRequest, head) {
   logger.info(`connect: ${request.url}`);
 
-  const ph = new URL(`http://${request.url}`);
-  const { hostname: host, port } = ph;
+  const target = new URL(`http://${request.url}`); // connect listeners don't have the protocol in the url
+  const proxy = getProxyInfo(proxyList, target);
 
+  if(proxy) {
+    onSocksHttps(target, request, socketRequest, head, proxy);
+  }
+  else {
+    onNoProxyHttps(target, request, socketRequest, head);
+  }
+}
+
+// forwarding
+
+function onSocksHttp(target, req, res, proxy) {
+  const socksAgent = new Socks.Agent({
+    proxy,
+    target: { host: target.hostname, port: target.port },
+  });
+  logger.info(`forwarding SOCKS HTTP for ${target} to ${proxy.ipaddress}:${proxy.port}`);
+  sendProxyRequest(target, req, res, socksAgent);
+}
+
+function onSocksHttps(target, request, socketRequest, head, proxy) {
   const options = {
     proxy,
-    target: { host, port },
+    target: { host: target.hostname, port: target.port },
     command: 'connect',
   };
+
+  logger.info(`forwarding SOCKS HTTPS for ${target} to ${proxy.ipaddress}:${proxy.port}`);
 
   let socket;
 
@@ -115,15 +126,15 @@ function onSocksHttps(request, socketRequest, head, proxy) {
   });
 }
 
-function onNoProxyHttp(req, res) {
-  sendProxyRequest(new URL(req.url), req, res);
+function onNoProxyHttp(target, req, res) {
+  logger.info(`forwarding HTTP for ${target} without tunneling`);
+  sendProxyRequest(target, req, res);
 }
 
-function onNoProxyHttps(req, socket, head) {
-  const ph = new URL(`http://${req.url}`);
-  const { hostname: host, port } = ph;
+function onNoProxyHttps(target, req, socket, head) {
   // Connect to an origin server
-  const serverSocket = net.connect(port || 80, host, () => {
+  logger.info(`forwarding HTTPS for ${target} without tunneling`);
+  const serverSocket = net.connect(target.port || 80, target.hostname, () => {
     socket.write('HTTP/1.1 200 Connection Established\r\n' +
       'Proxy-agent: Node.js-Proxy\r\n' +
       '\r\n');
@@ -133,117 +144,73 @@ function onNoProxyHttps(req, socket, head) {
   });
 }
 
-// listeners
+function sendProxyRequest(uri, request, response, agent) {
+  const options = {
+    port: uri.port,
+    hostname: uri.host,
+    method: request.method,
+    path: uri.path,
+    headers: request.headers,
+    agent,
+  };
 
-/**
- * called on HTTP targets
- */
-function requestListener(getProxyInfo, request, response) {
-  logger.info(`request: ${request.url}`);
+  const proxyRequest = http.request(options);
 
-  const proxy = getProxyInfo();
-  const type = 'SOCKS';
-  switch(type) {
-    case 'SOCKS':
-      onSocksHttp(request, response, proxy);
-      break;
-    case 'NONE':
-      onNoProxyHttp(request, response);
-      break;
-    default:
-      logger.error(`Type not supported: ${type}`);
-  }
-}
-
-/**
- * called on HTTPs targets
- */
-function connectListener(getProxyInfo, request, socketRequest, head) {
-  logger.info(`connect: ${request.url}`);
-
-  const proxy = getProxyInfo();
-  const type = 'SOCKS';
-  switch(type) {
-    case 'SOCKS':
-      onSocksHttps(request, socketRequest, head, proxy);
-      break;
-    case 'NONE':
-      onNoProxyHttps(request, socketRequest, head);
-      break;
-    default:
-      logger.error(`Type not supported: ${type}`);
-  }
-}
-
-function ProxyServer(options) {
-  // TODO: start point
-  http.Server.call(this, () => { });
-
-  this.proxyList = [];
-
-  if(options.socks) {
-    // stand alone proxy loging
-    this.loadProxy(options.socks);
-  } else if(options.socksList) {
-    // proxy list loading
-    this.loadProxyFile(options.socksList);
-    if(options.proxyListReloadTimeout) {
-      setInterval(
-        () => {
-          this.loadProxyFile(options.socksList);
-        },
-        options.proxyListReloadTimeout * 1000
-      );
-    }
-  }
-
-  this.addListener(
-    'request',
-    requestListener.bind(null, () => randomElement(this.proxyList))
-  );
-  this.addListener(
-    'connect',
-    connectListener.bind(null, () => randomElement(this.proxyList))
-  );
-}
-
-util.inherits(ProxyServer, http.Server);
-
-ProxyServer.prototype.loadProxy = function loadProxy(proxyLine) {
-  try {
-    this.proxyList.push(parseProxyLine(proxyLine));
-  } catch(ex) {
-    logger.error(ex.message);
-  }
-};
-
-ProxyServer.prototype.loadProxyFile = function loadProxyFile(fileName) {
-  const self = this;
-
-  logger.info(`Loading proxy list from file: ${fileName}`);
-
-  fs.readFile(fileName, (err, data) => {
-    if(err) {
-      logger.error(
-        `Impossible to read the proxy file : ${fileName} error : ${err.message}`
-      );
-      return;
-    }
-
-    const lines = data.toString().split('\n');
-    const proxyList = [];
-    for(let i = 0; i < lines.length; i += 1) {
-      if(!(lines[i] !== '' && lines[i].charAt(0) !== '#')) {
-        try {
-          proxyList.push(parseProxyLine(lines[i]));
-        } catch(ex) {
-          logger.error(ex.message);
-        }
-      }
-    }
-    self.proxyList = proxyList;
+  request.on('error', (err) => {
+    logger.error(`${err.message}`);
+    proxyRequest.destroy(err);
   });
-};
+
+  proxyRequest.on('error', (error) => {
+    logger.error(`${error.message} on connection to  ${uri.host}:${uri.port}`);
+    response.writeHead(500);
+    response.end('Connection error\n');
+  });
+
+  proxyRequest.on('response', (proxyResponse) => {
+    proxyResponse.pipe(response);
+    response.writeHead(proxyResponse.statusCode, proxyResponse.headers);
+  });
+
+  request.pipe(proxyRequest);
+}
+
+// helpers
+
+function getProxyInfo(proxyList, target) {
+  let proxyEntry = proxyList
+    .find(el =>
+      (!el.whitelist || regexListMatchesString(el.whitelist, target.hostname)) &&
+      (!el.blacklist || !regexListMatchesString(el.blacklist, target.hostname)));
+
+  return proxyEntry ? proxyEntry.socksProxy : undefined;
+
+}
+
+function regexListMatchesString(list, string) {
+  return !!list.find(regEx => regEx.test(string));
+}
+
+function getProxyObject(host, port, login, password) {
+  return {
+    ipaddress: host,
+    port: parseInt(port, 10),
+    type: 5,
+    authentication: { username: login || '', password: password || '' },
+  };
+}
+
+function parseProxyLine(line) {
+  const proxyInfo = line.split(':');
+
+  if(proxyInfo.length !== 4 && proxyInfo.length !== 2) {
+    throw new Error(`Incorrect proxy line: ${line}`);
+  }
+
+  return getProxyObject.apply(this, proxyInfo);
+}
+
+// exports
 
 module.exports = {
   createServer: options => new ProxyServer(options),

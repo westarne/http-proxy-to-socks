@@ -29,22 +29,41 @@ Other options:
 ```
 Options:
 
-  -h, --help             output usage information
-  -V, --version          output the version number
-  -s, --socks [socks]    specify your socks proxy host, default: 127.0.0.1:1080
-  -p, --port [port]      specify the listening port of http proxy server, default: 8080
-  -c, --config [config]  read configs from file in json format
-  --level [level]        log level, vals: info, error
+  -h, --help                  output usage information
+  -V, --version               output the version number
+  -s, --socks [socks]         specify your socks proxy host (only one possible through cli), default: 127.0.0.1:1080
+  -l, --host [host]           specify the listening host of http proxy server, default: 127.0.0.1
+  -p, --port [port]           specify the listening port of http proxy server, default: 8080
+  -c, --config [config]       read configs from file in json format
+  --level [level]             log level, vals: info, error
 ```
 
-You can specify a `json` config file with `-c`:
+The cli commands do not support white-/blacklists. This is only possible using the `json` config file with `-c`:
 
 ```json
 {
-  "socks": "127.0.0.1:1080",
-  "port": 8080
+  "host": "127.0.0.1",
+  "port": 8080,
+  "level": "info",
+  "proxies": [
+    {
+      "socks": "127.0.0.1:1080",
+      "whitelist": [ "google\\.com", "\\.org$" ]
+    },
+    {
+      "socks": "127.0.0.1:1081",
+      "blacklist": [ "^github\\.com$" ]
+    }
+  ]
 }
 ```
+
+### White- and Blacklists
+
+White- and blacklists can be used to determine hosts that either should or should not be proxied. These are regular expressions being matched against the **hostname** of the target. The protocol/host/path are not part of this matching.
+Make sure to use correct RegExp syntax für JavaScript. You can only have either a white- or a blacklist. Since a whitelist is usually more limiting, if both are specified only the whitelist will be used.
+
+Hosts defined in a whitelist will be proxied, all other hosts will be accessed without going through the socks proxy defined. Blacklisted vice versa.
 
 ## CONTRIBUTE
 

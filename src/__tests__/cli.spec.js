@@ -14,12 +14,14 @@ describe('cli', () => {
       const res = getOptionsArgs(options);
 
       Object.keys(options).forEach((name) => {
-        if (name === 'FIELD_NOT_EXIST') {
+        if(name === 'FIELD_NOT_EXIST') {
           expect(res[name]).toBeFalsy();
-          return;
+        } else if(name === 'socks') {
+          expect(res.proxies[0]).toBeTruthy();
+        } else {
+          expect(res[name]).toBeTruthy();
         }
 
-        expect(res[name]).toBeTruthy();
       });
     });
   });

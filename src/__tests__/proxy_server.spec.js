@@ -36,7 +36,7 @@ const {
 
 describe('proxy_server', () => {
   const requestURL = 'https://google.com';
-  let getProxyInfo;
+  let proxyList;
   let request;
   let socksRequest;
   let response;
@@ -44,12 +44,30 @@ describe('proxy_server', () => {
   let socket;
 
   beforeEach(() => {
-    getProxyInfo = jest.fn(() => ({
-      ipaddress: '127.0.0.1',
-      port: 8080,
-      type: 5,
-      authentication: { username: '', password: '' },
-    }));
+    proxyList = [{
+      socksProxy: {
+        ipaddress: '127.0.0.1',
+        port: 8080,
+        type: 5,
+        authentication: { username: '', password: '' },
+      },
+      whitelist: [
+        new RegExp('google\\.com'),
+        new RegExp('\\.org$')
+      ]
+    },
+    {
+      socksProxy: {
+        ipaddress: '127.0.0.1',
+        port: 8081,
+        type: 5,
+        authentication: { username: '', password: '' },
+      },
+      blacklist: [
+        new RegExp('^github\\.com$')
+      ]
+    }
+    ];
 
     request = {
       on: jest.fn(),
@@ -84,7 +102,7 @@ describe('proxy_server', () => {
   });
 
   describe('getProxyObject', () => {
-    it('should return a object with "ipaddress", "port", "type", "authentication" properties', () => {
+    it('should return an object with "ipaddress", "port", "type", "authentication" properties', () => {
       const host = '127.0.0.1';
       const port = '8080';
       const res = getProxyObject(host, port);
@@ -127,7 +145,7 @@ describe('proxy_server', () => {
 
       try {
         error = parseProxyLine(proxyLine);
-      } catch (err) {
+      } catch(err) {
         error = err;
       }
 
@@ -138,7 +156,7 @@ describe('proxy_server', () => {
 
       try {
         error = parseProxyLine(proxyLine);
-      } catch (err) {
+      } catch(err) {
         error = err;
       }
 
@@ -148,7 +166,7 @@ describe('proxy_server', () => {
 
   describe('requestListener', () => {
     it('should create an socks agent and take it as request agent', () => {
-      requestListener(getProxyInfo, request, response);
+      requestListener(proxyList, request, response);
 
       const lastCall = last(Socks.Agent.mock.calls);
       const httpLastCall = last(http.request.mock.calls);
@@ -158,7 +176,7 @@ describe('proxy_server', () => {
     });
 
     it('should return 500 when error thrown', () => {
-      requestListener(getProxyInfo, request, response);
+      requestListener(proxyList, request, response);
 
       const onErrorArgs = getLastMockOn('error');
 
@@ -179,7 +197,7 @@ describe('proxy_server', () => {
         pipe: jest.fn(),
       };
 
-      requestListener(getProxyInfo, request, response);
+      requestListener(proxyList, request, response);
 
       const onResponseArgs = getLastMockOn('response');
 
@@ -194,7 +212,7 @@ describe('proxy_server', () => {
   describe('connectListener', () => {
     it('should create socks connections', () => {
       const head = '';
-      connectListener(getProxyInfo, socksRequest, socketRequest, head);
+      connectListener(proxyList, socksRequest, socketRequest, head);
 
       const lastCreateConnectionCall = last(Socks.createConnection.mock.calls);
 
@@ -203,7 +221,7 @@ describe('proxy_server', () => {
 
     it('should write 500 when error thrown', () => {
       const head = '';
-      connectListener(getProxyInfo, socksRequest, socketRequest, head);
+      connectListener(proxyList, socksRequest, socketRequest, head);
 
       const lastCreateConnectionCall = last(Socks.createConnection.mock.calls);
 
@@ -218,7 +236,7 @@ describe('proxy_server', () => {
     it('should pipe sockets when socket connected', () => {
       const head = '';
 
-      connectListener(getProxyInfo, socksRequest, socketRequest, head);
+      connectListener(proxyList, socksRequest, socketRequest, head);
 
       const lastCreateConnectionCall = last(Socks.createConnection.mock.calls);
 
@@ -234,15 +252,17 @@ describe('proxy_server', () => {
   describe('createServer', () => {
     it('should push this.proxyList', () => {
       const options = {
-        socks: '127.0.0.1:1080',
+        proxies: [{
+          socks: '127.0.0.1:1080'
+        }]
       };
 
       createServer(options);
 
       const { proxyList } = http.Server.mock.instances[0];
 
-      expect(proxyList[0].ipaddress).toBe('127.0.0.1');
-      expect(proxyList[0].port).toBe(1080);
+      expect(proxyList[0].socksProxy.ipaddress).toBe('127.0.0.1');
+      expect(proxyList[0].socksProxy.port).toBe(1080);
     });
 
     it('should listen both "request" and "connect" events', () => {

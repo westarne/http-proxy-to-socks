@@ -11,14 +11,16 @@ const DEFAULT_OPTIONS = {
 function createServer(opts) {
   const options = Object.assign({}, DEFAULT_OPTIONS, opts);
 
-  if (typeof options.level === 'string') {
+  if(typeof options.level === 'string') {
     changeLevel(logger, options.level);
   }
 
-  const { port, socks, host } = options;
+  const { port, proxies, host } = options;
 
   // eslint-disable-next-line
-  console.log(`SOCKS: ${socks}\nhttp-proxy listening: ${host}:${port}`);
+  console.log(`http-proxy listening: ${host}:${port}`);
+  proxies.forEach(proxy => console.log(
+    `socks target: ${proxy.socks}, whitelist: '${proxy.whitelist || ''}', blacklist: '${proxy.blacklist || ''}'`));
 
   return createProxyServer(options).listen(port, host);
 }
