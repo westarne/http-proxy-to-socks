@@ -1,12 +1,12 @@
 # http-proxy-to-socks
 
-[![build](https://api.travis-ci.org/oyyd/http-proxy-to-socks.svg?branch=master)](https://travis-ci.org/oyyd/http-proxy-to-socks)
-
-[简介](https://github.com/oyyd/http-proxy-to-socks/blob/master/READMECN.md)
+Fork of https://github.com/oyyd/http-proxy-to-socks.
 
 hpts(http-proxy-to-socks) is a nodejs tool to convert SOCKS proxy into http proxy.
 
 Many clients support setting up http proxy to speed up network requests and for sometimes only SOCKS proxy is available to you. SOCKS proxy supports TCP so that it's possible to convert those requests from http proxy into SOCKS protocol. In this way, you can still keep the goodness provided by your SOCKS proxy(e.g. encryption).
+
+This fork additionally provides the functionality to proxy only selected hosts and also define different socks proxies chosen by the target hostname of your request.
 
 ## Setup
 
@@ -14,7 +14,7 @@ Many clients support setting up http proxy to speed up network requests and for 
 npm install -g http-proxy-to-socks
 ```
 
-Make sure your nodejs version is greater than `4`.
+Make sure your nodejs version is greater/equal to `14`.
 
 ## Usage
 
@@ -35,10 +35,12 @@ Options:
   -l, --host [host]           specify the listening host of http proxy server, default: 127.0.0.1
   -p, --port [port]           specify the listening port of http proxy server, default: 8080
   -c, --config [config]       read configs from file in json format
-  --level [level]             log level, vals: info, error
+  --level [level]             log level, vals: info, error, default: error
 ```
 
-The cli commands do not support white-/blacklists. This is only possible using the `json` config file with `-c`:
+### Configuration File
+
+The cli parameters do not support white-/blacklists. This is only possible using the `json` config file with `-c`:
 
 ```json
 {

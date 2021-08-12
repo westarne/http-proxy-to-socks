@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2.0.0
+- completely renewed dependencies and removed unnecessary overhead
+- implemented new configuration properties to allow different socks proxies at the same time
+- added white-/blacklisting based on target hostnames
+
 ## 1.1.1
 - src: Use parsed url hostname instead of host which may contain also port
 
