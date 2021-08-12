@@ -12,7 +12,7 @@ const DEFAULT_COMMON_OPTIONS = {
 
 function fillDigit(num) {
   const str = String(num);
-  if (str.length === 1) {
+  if(str.length === 1) {
     return `0${str}`;
   }
 
@@ -23,8 +23,8 @@ function getFormatedDate() {
   const date = new Date();
 
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
-      + ` ${fillDigit(date.getHours())}:${fillDigit(date.getMinutes())}`
-      + `:${fillDigit(date.getSeconds())}`;
+    + ` ${fillDigit(date.getHours())}:${fillDigit(date.getMinutes())}`
+    + `:${fillDigit(date.getSeconds())}`;
 }
 
 function createTransports() {
@@ -34,9 +34,9 @@ function createTransports() {
 }
 
 function colorLevel(str) {
-  if (str === 'error') {
+  if(str === 'error') {
     return chalk.red(str);
-  } else if (str === 'info') {
+  } else if(str === 'info') {
     return chalk.green(str);
   }
 
@@ -46,7 +46,7 @@ function colorLevel(str) {
 function createLogger(level = 'warn') {
   return createWinstonLogger({
     format: combine(printf(info =>
-        `${getFormatedDate()} - ${colorLevel(info.level)} ${info.message}`)),
+      `${getFormatedDate()} - ${colorLevel(info.level)} ${info.message}`)),
     level,
     transports: createTransports(),
   });
