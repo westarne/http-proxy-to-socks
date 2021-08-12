@@ -218,4 +218,5 @@ module.exports = {
   connectListener,
   getProxyObject,
   parseProxyLine,
+  getProxyInfo,
 };

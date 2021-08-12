@@ -32,6 +32,7 @@ const {
   parseProxyLine,
   requestListener,
   connectListener,
+  getProxyInfo,
 } = require('../proxy_server');
 
 describe('proxy_server', () => {
@@ -279,6 +280,31 @@ describe('proxy_server', () => {
 
       expect(onRequestArgs.length > 0).toBeTruthy();
       expect(onConnectArgs.length > 0).toBeTruthy();
+    });
+  });
+
+  describe('getProxyInfo', () => {
+    it('should select socks proxy by whitelist', () => {
+
+      let result = getProxyInfo(proxyList, new URL('http://google.com'));
+
+      expect(result.ipaddress).toBe('127.0.0.1');
+      expect(result.port).toBe(8080);
+    });
+
+    it('should select socks proxy by avoiding blacklist', () => {
+
+      let result = getProxyInfo(proxyList, new URL('http://google.de'));
+
+      expect(result.ipaddress).toBe('127.0.0.1');
+      expect(result.port).toBe(8081);
+    });
+
+    it('should return empty if no proxy matches', () => {
+
+      let result = getProxyInfo(proxyList, new URL('http://github.com'));
+
+      expect(result).toBe(undefined);
     });
   });
 });
