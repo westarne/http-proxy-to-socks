@@ -5,10 +5,12 @@
     "it": true,
     "describe": true,
     "beforeEach": true,
-    "jest": true
+    "jest": true,
+    "URL": true
   },
   "rules": {
     "no-underscore-dangle": 0,
-    "comma-dangle": 0
+    "comma-dangle": 0,
+    "keyword-spacing": "off"
   }
 }
