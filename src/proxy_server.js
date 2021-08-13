@@ -131,16 +131,33 @@ function onNoProxyHttp(target, req, res) {
   sendProxyRequest(target, req, res);
 }
 
-function onNoProxyHttps(target, req, socket, head) {
+function onNoProxyHttps(target, req, socketRequest, head) {
   // Connect to an origin server
   logger.info(`forwarding HTTPS for ${target} without tunneling`);
-  const serverSocket = net.connect(target.port || 80, target.hostname, () => {
-    socket.write('HTTP/1.1 200 Connection Established\r\n' +
+  const socket = new net.Socket();
+
+  socketRequest.on('error', (err) => {
+    logger.error(`Error on request socket: ${err.message}`);
+    if(socket) {
+      socket.destroy(err);
+    }
+  });
+
+  socket.on('error', (err) => {
+    logger.error(`Error on target socket: ${err.message}`);
+    socketRequest.destroy(err);
+  });
+
+  socket.connect(target.port || 80, target.hostname, () => {
+
+    // tunneling to the host
+    socket.pipe(socketRequest);
+    socketRequest.pipe(socket);
+
+    socket.write(head);
+    socketRequest.write('HTTP/1.1 200 Connection Established\r\n' +
       'Proxy-agent: Node.js-Proxy\r\n' +
       '\r\n');
-    serverSocket.write(head);
-    serverSocket.pipe(socket);
-    socket.pipe(serverSocket);
   });
 }
 
