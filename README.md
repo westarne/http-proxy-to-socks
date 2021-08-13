@@ -10,16 +10,19 @@ This fork additionally provides the functionality to proxy only selected hosts a
 
 ## Setup
 
-```
-npm install -g http-proxy-to-socks
-```
+This fork was not released on npm, so you have to install it manually.
+
+1. clone or download this repository
+2. open a terminal in the downloaded directory
+3. run `npm install`
+4. run the module using `node bin/hpts.js [parameters]`
 
 Make sure your nodejs version is greater/equal to `14`.
 
 ## Usage
 
 ```
-hpts -s 127.0.0.1:1080 -p 8080
+node <path-to-module>/bin/hpts.js -s 127.0.0.1:1080 -p 8080
 ```
 
 This will start a process listening on `8080` as a http proxy. It will convert http requests into socks requests and send them to port `1080`. Please make sure your socks service is available at the corresponding port.
