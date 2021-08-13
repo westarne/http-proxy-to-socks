@@ -34,7 +34,7 @@ Options:
   -s, --socks [socks]         specify your socks proxy host (only one possible through cli), default: 127.0.0.1:1080
   -l, --host [host]           specify the listening host of http proxy server, default: 127.0.0.1
   -p, --port [port]           specify the listening port of http proxy server, default: 8080
-  -c, --config [config]       read configs from file in json format
+  -c, --config [config]       path to a json config file or the json config as string
   --level [level]             log level, vals: info, error, default: error
 ```
 

@@ -3,7 +3,9 @@ const { createServer: createProxyServer } = require('./proxy_server');
 
 const DEFAULT_OPTIONS = {
   host: '127.0.0.1',
-  socks: '127.0.0.1:1080',
+  proxies: [{
+    socks: '127.0.0.1:1080'
+  }],
   proxyListReloadTimeout: 60,
   port: 8080,
 };

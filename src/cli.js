@@ -12,10 +12,14 @@ const optionNames = [
   'host',
 ];
 
-function getFileConfig(filePath) {
-  const absFile = resolve(process.cwd(), filePath);
+function getConfig(configValue) {
 
-  const content = readFileSync(absFile).toString('utf8');
+  let content = configValue;
+
+  if(!configValue.startsWith('{')) {
+    const absFile = resolve(process.cwd(), configValue);
+    content = readFileSync(absFile).toString('utf8');
+  }
 
   let fileConfig = null;
 
@@ -56,7 +60,7 @@ function main() {
     .option('-s, --socks [socks]', 'specify your socks proxy hosts, default: 127.0.0.1:1080')
     .option('-p, --port [port]', 'specify the listening port of http proxy server, default: 8080')
     .option('-l, --host [host]', 'specify the listening host of http proxy server, default: 127.0.0.1')
-    .option('-c, --config [config]', 'read configs from file in json format')
+    .option('-c, --config [config]', 'path to a json config file or the json config as string')
     .option('--level [level]', 'log level, vals: info, error')
     .parse(process.argv);
 
@@ -65,7 +69,7 @@ function main() {
   let fileConfig = null;
 
   if(options.config) {
-    fileConfig = getFileConfig(options.config);
+    fileConfig = getConfig(options.config);
   }
 
   Object.assign(options, fileConfig);
