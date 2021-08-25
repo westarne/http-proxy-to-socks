@@ -115,7 +115,7 @@ function onSocksConnect(target, request, socketRequest, head, proxy) {
 
     if(error) {
       // error in SocksSocket creation
-      logger.error(`${error.message} connection creating on ${proxy.ipaddress}:${proxy.port}`);
+      logger.error(`${error.message} connection creating on ${proxy.host}:${proxy.port}`);
       socketRequest.write(`HTTP/${request.httpVersion} 500 Connection error\r\n\r\n`);
       return;
     }
