@@ -1,8 +1,10 @@
 // inspired by https://github.com/asluchevskiy/http-to-socks-proxy
 const util = require('util');
 const http = require('http');
+const https = require('https');
 const net = require('net');
 const Socks = require('socks');
+const SocksProxyAgent = require('socks-proxy-agent');
 const { logger } = require('./logger');
 
 // object class definition
@@ -48,10 +50,10 @@ function requestListener(proxyList, request, response) {
   const proxy = getProxyInfo(proxyList, target);
 
   if(proxy) {
-    onSocksHttp(target, request, response, proxy);
+    onSocksRequest(target, request, response, proxy);
   }
   else {
-    onNoProxyHttp(target, request, response);
+    onNoProxyRequest(target, request, response);
   }
 }
 
@@ -65,32 +67,39 @@ function connectListener(proxyList, request, socketRequest, head) {
   const proxy = getProxyInfo(proxyList, target);
 
   if(proxy) {
-    onSocksHttps(target, request, socketRequest, head, proxy);
+    onSocksConnect(target, request, socketRequest, head, proxy);
   }
   else {
-    onNoProxyHttps(target, request, socketRequest, head);
+    onNoProxyConnect(target, request, socketRequest, head);
   }
 }
 
 // forwarding
 
-function onSocksHttp(target, req, res, proxy) {
-  const socksAgent = new Socks.Agent({
-    proxy,
-    target: { host: target.hostname, port: target.port },
+function onSocksRequest(target, req, res, proxy) {
+  const socksAgent = new SocksProxyAgent({
+    host: proxy.host,
+    port: proxy.port,
+    userId: proxy.user,
+    password: proxy.pass
   });
-  logger.info(`forwarding SOCKS HTTP for ${target} to ${proxy.ipaddress}:${proxy.port}`);
+  logger.info(`forwarding SOCKS HTTP(s) request for ${target} to ${proxy.host}:${proxy.port}`);
   sendProxyRequest(target, req, res, socksAgent);
 }
 
-function onSocksHttps(target, request, socketRequest, head, proxy) {
+function onSocksConnect(target, request, socketRequest, head, proxy) {
   const options = {
-    proxy,
-    target: { host: target.hostname, port: target.port },
+    proxy: {
+      ipaddress: proxy.host,
+      port: proxy.port,
+      type: 5,
+      authentication: { username: proxy.user || '', password: proxy.pass || '' },
+    },
+    target: { host: target.hostname, port: getPortFromUrl(target) },
     command: 'connect',
   };
 
-  logger.info(`forwarding SOCKS HTTPS for ${target} to ${proxy.ipaddress}:${proxy.port}`);
+  logger.info(`forwarding SOCKS HTTP(s) connect for ${target} to ${proxy.host}:${proxy.port}`);
 
   let socket;
 
@@ -126,12 +135,12 @@ function onSocksHttps(target, request, socketRequest, head, proxy) {
   });
 }
 
-function onNoProxyHttp(target, req, res) {
+function onNoProxyRequest(target, req, res) {
   logger.info(`forwarding HTTP for ${target} without tunneling`);
   sendProxyRequest(target, req, res);
 }
 
-function onNoProxyHttps(target, req, socketRequest, head) {
+function onNoProxyConnect(target, req, socketRequest, head) {
   // Connect to an origin server
   logger.info(`forwarding HTTPS for ${target} without tunneling`);
   const socket = new net.Socket();
@@ -148,7 +157,7 @@ function onNoProxyHttps(target, req, socketRequest, head) {
     socketRequest.destroy(err);
   });
 
-  socket.connect(target.port || 80, target.hostname, () => {
+  socket.connect(getPortFromUrl(target), target.hostname, () => {
 
     // tunneling to the host
     socket.pipe(socketRequest);
@@ -163,15 +172,15 @@ function onNoProxyHttps(target, req, socketRequest, head) {
 
 function sendProxyRequest(uri, request, response, agent) {
   const options = {
-    port: uri.port,
     hostname: uri.host,
+    port: getPortFromUrl(uri),
+    path: uri.pathname,
     method: request.method,
-    path: uri.path,
     headers: request.headers,
     agent,
   };
 
-  const proxyRequest = http.request(options);
+  const proxyRequest = uri.protocol === 'http:' ? http.request(options) : https.request(options);
 
   request.on('error', (err) => {
     logger.error(`${err.message}`);
@@ -179,7 +188,7 @@ function sendProxyRequest(uri, request, response, agent) {
   });
 
   proxyRequest.on('error', (error) => {
-    logger.error(`${error.message} on connection to  ${uri.host}:${uri.port}`);
+    logger.error(`${error.message} on connection to  ${uri.host}:${getPortFromUrl(uri)}`);
     response.writeHead(500);
     response.end('Connection error\n');
   });
@@ -193,6 +202,10 @@ function sendProxyRequest(uri, request, response, agent) {
 }
 
 // helpers
+
+function getPortFromUrl(uri) {
+  return uri.port || (uri.protocol === 'http:' ? 80 : 443);
+}
 
 function getProxyInfo(proxyList, target) {
   let proxyEntry = proxyList
@@ -210,10 +223,10 @@ function regexListMatchesString(list, string) {
 
 function getProxyObject(host, port, login, password) {
   return {
-    ipaddress: host,
+    host,
     port: parseInt(port, 10),
-    type: 5,
-    authentication: { username: login || '', password: password || '' },
+    user: login,
+    pass: password
   };
 }
 

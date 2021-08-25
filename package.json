@@ -27,6 +27,7 @@
     "chalk": "^2.4.2",
     "commander": "^8.1.0",
     "socks": "^1.1.10",
+    "socks-proxy-agent": "^6.0.0",
     "winston": "^3.3.3"
   },
   "devDependencies": {

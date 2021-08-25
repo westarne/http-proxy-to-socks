@@ -11,10 +11,21 @@ jest.mock('http', () => ({
   }),
 }));
 
+jest.mock('https', () => ({
+  request: jest.fn(() => ({
+    on: mockOn,
+  })),
+  Server: jest.fn(function Server() {
+    this.addListener = jest.fn();
+  }),
+}));
+
 jest.mock('socks', () => ({
   createConnection: jest.fn(),
   Agent: jest.fn(() => mockAgent),
 }));
+
+jest.mock('socks-proxy-agent', () => jest.fn(() => mockAgent));
 
 function last(array) {
   return array[array.length - 1];
@@ -25,7 +36,9 @@ function getLastMockOn(event) {
 }
 
 const http = require('http');
+const https = require('https');
 const Socks = require('socks');
+const SocksProxyAgent = require('socks-proxy-agent');
 const {
   createServer,
   getProxyObject,
@@ -47,10 +60,8 @@ describe('proxy_server', () => {
   beforeEach(() => {
     proxyList = [{
       socksProxy: {
-        ipaddress: '127.0.0.1',
+        host: '127.0.0.1',
         port: 8080,
-        type: 5,
-        authentication: { username: '', password: '' },
       },
       whitelist: [
         new RegExp('google\\.com'),
@@ -59,10 +70,8 @@ describe('proxy_server', () => {
     },
     {
       socksProxy: {
-        ipaddress: '127.0.0.1',
+        host: '127.0.0.1',
         port: 8081,
-        type: 5,
-        authentication: { username: '', password: '' },
       },
       blacklist: [
         new RegExp('^github\\.com$')
@@ -103,18 +112,16 @@ describe('proxy_server', () => {
   });
 
   describe('getProxyObject', () => {
-    it('should return an object with "ipaddress", "port", "type", "authentication" properties', () => {
+    it('should return an object with "host", "port", "user", "pass" properties', () => {
       const host = '127.0.0.1';
       const port = '8080';
       const res = getProxyObject(host, port);
 
       expect(typeof res).toBe('object');
-      expect(res.ipaddress).toBe(host);
+      expect(res.host).toBe(host);
       expect(res.port).toBe(parseInt(port, 10));
-      expect(res.type).toBe(5);
-      expect(typeof res.authentication).toBe('object');
-      expect(Object.hasOwnProperty.apply(res.authentication, ['username'])).toBeTruthy();
-      expect(Object.hasOwnProperty.apply(res.authentication, ['password'])).toBeTruthy();
+      expect(res.user).toBeFalsy();
+      expect(res.pass).toBeFalsy();
     });
   });
 
@@ -124,7 +131,7 @@ describe('proxy_server', () => {
       const res = parseProxyLine(proxyLine);
 
       expect(typeof res).toBe('object');
-      expect(res.ipaddress).toBe('127.0.0.1');
+      expect(res.host).toBe('127.0.0.1');
       expect(res.port).toBe(1080);
     });
 
@@ -133,11 +140,10 @@ describe('proxy_server', () => {
       const res = parseProxyLine(proxyLine);
 
       expect(typeof res).toBe('object');
-      expect(res.ipaddress).toBe('127.0.0.1');
+      expect(res.host).toBe('127.0.0.1');
       expect(res.port).toBe(1080);
-      expect(typeof res.authentication).toBe('object');
-      expect(res.authentication.username).toBe('oyyd');
-      expect(res.authentication.password).toBe('password');
+      expect(res.user).toBe('oyyd');
+      expect(res.pass).toBe('password');
     });
 
     it('should throw error when the proxy string seems not good', () => {
@@ -166,13 +172,24 @@ describe('proxy_server', () => {
   });
 
   describe('requestListener', () => {
-    it('should create an socks agent and take it as request agent', () => {
-      requestListener(proxyList, request, response);
 
-      const lastCall = last(Socks.Agent.mock.calls);
+    it('should create an socks agent and take it as request agent (http)', () => {
+      requestListener(proxyList, { ...request, url: requestURL.replace(/https/g, 'http') }, response);
+
+      const lastCall = last(SocksProxyAgent.mock.calls);
       const httpLastCall = last(http.request.mock.calls);
 
-      expect(requestURL.indexOf(lastCall[0].target.host) > -1).toBeTruthy();
+      expect(lastCall[0].host).toBe(proxyList[0].socksProxy.host);
+      expect(httpLastCall[0].agent === mockAgent).toBeTruthy();
+    });
+
+    it('should create an socks agent and take it as request agent (https)', () => {
+      requestListener(proxyList, request, response);
+
+      const lastCall = last(SocksProxyAgent.mock.calls);
+      const httpLastCall = last(https.request.mock.calls);
+
+      expect(lastCall[0].host).toBe(proxyList[0].socksProxy.host);
       expect(httpLastCall[0].agent === mockAgent).toBeTruthy();
     });
 
@@ -262,7 +279,7 @@ describe('proxy_server', () => {
 
       const { proxyList } = http.Server.mock.instances[0];
 
-      expect(proxyList[0].socksProxy.ipaddress).toBe('127.0.0.1');
+      expect(proxyList[0].socksProxy.host).toBe('127.0.0.1');
       expect(proxyList[0].socksProxy.port).toBe(1080);
     });
 
@@ -288,7 +305,7 @@ describe('proxy_server', () => {
 
       let result = getProxyInfo(proxyList, new URL('http://google.com'));
 
-      expect(result.ipaddress).toBe('127.0.0.1');
+      expect(result.host).toBe('127.0.0.1');
       expect(result.port).toBe(8080);
     });
 
@@ -296,7 +313,7 @@ describe('proxy_server', () => {
 
       let result = getProxyInfo(proxyList, new URL('http://google.de'));
 
-      expect(result.ipaddress).toBe('127.0.0.1');
+      expect(result.host).toBe('127.0.0.1');
       expect(result.port).toBe(8081);
     });
 
