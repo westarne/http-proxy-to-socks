@@ -174,7 +174,7 @@ function sendProxyRequest(uri, request, response, agent) {
   const options = {
     hostname: uri.host,
     port: getPortFromUrl(uri),
-    path: uri.pathname,
+    path: `${uri.pathname}?${uri.searchParams}`,
     method: request.method,
     headers: request.headers,
     agent,
