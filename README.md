@@ -71,6 +71,10 @@ Make sure to use correct RegExp syntax für JavaScript. You can only have either
 
 Hosts defined in a whitelist will be proxied, all other hosts will be accessed without going through the socks proxy defined. Blacklisted vice versa.
 
+### Proxy Authentication
+
+Use the basic auth syntax to add proxy credentials. E.g. `someuser:password@myproxy:1080`.
+
 ## CONTRIBUTE
 
 Please add more tests for corresponding features when you send a PR:

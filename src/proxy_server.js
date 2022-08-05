@@ -188,7 +188,7 @@ function sendProxyRequest(uri, request, response, agent) {
   });
 
   proxyRequest.on('error', (error) => {
-    logger.error(`${error.message} on connection to  ${uri.host}:${getPortFromUrl(uri)}`);
+    logger.error(`${error.message} on connection to ${uri.host}:${getPortFromUrl(uri)}`);
     response.writeHead(500);
     response.end('Connection error\n');
   });
@@ -231,13 +231,15 @@ function getProxyObject(host, port, login, password) {
 }
 
 function parseProxyLine(line) {
-  const proxyInfo = line.split(':');
+
+  const credentials = line.indexOf('@') > 0 ? line.substring(0, line.indexOf('@')).split(':') : [];
+  const proxyInfo = line.substring(line.indexOf('@') + 1).split(':');
 
   if(proxyInfo.length !== 4 && proxyInfo.length !== 2) {
     throw new Error(`Incorrect proxy line: ${line}`);
   }
 
-  return getProxyObject.apply(this, proxyInfo);
+  return getProxyObject.apply(this, [...proxyInfo, ...credentials]);
 }
 
 // exports
