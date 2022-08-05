@@ -172,7 +172,7 @@ function onNoProxyConnect(target, req, socketRequest, head) {
 
 function sendProxyRequest(uri, request, response, agent) {
   const options = {
-    hostname: uri.host,
+    hostname: uri.hostname,
     port: getPortFromUrl(uri),
     path: `${uri.pathname}?${uri.searchParams}`,
     method: request.method,
@@ -188,7 +188,7 @@ function sendProxyRequest(uri, request, response, agent) {
   });
 
   proxyRequest.on('error', (error) => {
-    logger.error(`${error.message} on connection to ${uri.host}:${getPortFromUrl(uri)}`);
+    logger.error(`${error.message} on connection to ${uri.hostname}:${getPortFromUrl(uri)}`);
     response.writeHead(500);
     response.end('Connection error\n');
   });
