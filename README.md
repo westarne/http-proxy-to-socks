@@ -15,7 +15,7 @@ This fork was not released on npm, so you have to install it manually.
 1. if you have hpts from official npm installed run `npm uninstall -g http-proxy-to-socks`, to uninstall it. Run `hpts` to test whether it was removed correctly.
 2. clone or download this repository
 3. open a terminal in the downloaded directory
-4. run `npm link` (will install dependencies and link the hpts command)
+4. run `npm i && npm link` (will install dependencies and link the hpts command)
 5. run the module using `hpts [parameters]` (from anywhere on your machine)
 
 Make sure your nodejs version is greater/equal to `14`.
